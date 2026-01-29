@@ -1,0 +1,63 @@
+global:
+  scrape_interval:     15s # By default, scrape targets every 15 seconds.
+  evaluation_interval: 15s # Evaluate rules every 15 seconds.
+
+rule_files:
+  - 'prometheus.rules.yml'
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: 'petclinic'
+    # scrape_interval: 5s
+    static_configs:
+      - targets: ['petclinic:9100','petclinic:9995','petclinic:9256']
+        labels:
+          group: 'petclinic'
+
+  - job_name: 'wordpress'
+    # scrape_interval: 5s
+    static_configs:
+      - targets: ['wordpress:9100','wordpress:9995','wordpress:9256']
+        labels:
+          group: 'wordpress'
+
+  - job_name: 'Database'
+    static_configs:
+      # 9104 = mysqld_exporter, 9256 Process exporter, 9995 disk exporter, 9100 node
+      - targets: ['dbmon:9104','database:9995','database:9100','database:9256']
+        labels:
+          group: 'database'
+
+  # Assumes server has /etc/docker/daemon.json with "metrics-addr": "172.13.0.1:9323", "experimental": true
+  - job_name: 'Server'
+    static_configs:
+      - targets: ['172.31.0.1:9323']
+        labels:
+          group: 'Server'
+  
+  - job_name: 'blackbox'
+    metrics_path: /probe
+    params:
+      module:
+        - http_1xx
+        - http_2xx
+        - http_3xx
+        - http_4xx
+        - http_5xx
+    static_configs:
+      - targets:
+        - petclinic:8080
+        - wordpress:8001/wp-login.php
+    relabel_configs:
+      - source_labels:
+          - __address__
+        target_label: __param_target
+        replacement: http://$1/
+      - source_labels:
+          - __param_target
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox:9115

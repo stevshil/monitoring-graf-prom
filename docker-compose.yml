@@ -1,0 +1,82 @@
+services:
+  prometheus:
+    image: prom/prometheus
+    volumes:
+      - type: volume
+        source: prom-data
+        target: /var/lib/prometheus
+      - ./containers/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - 9100:9100
+      - 9090:9090
+
+  grafana:
+    image: grafana/grafana
+    ports:
+      - 3000:3000
+    volumes:
+      - ./containers/grafana/data:/var/lib/grafana
+      - ./containers/grafana/prometheus.yaml:/etc/grafana/provisioning/datasources/prometheus.yml
+    environment:
+      - GF_PLUGINS_PREINSTALL=grafana-simple-json-datasource
+
+  dbmon:
+    image: prom/mysqld-exporter:v0.13.0
+    container_name: dbmon
+    environment:
+      DATA_SOURCE_NAME: 'exporter:promexporter123@(database:3306)/'
+    command: --collect.global_status --collect.info_schema.innodb_metrics --collect.auto_increment.columns --collect.info_schema.processlist --collect.binlog_size --collect.info_schema.tablestats --collect.global_variables --collect.info_schema.query_response_time --collect.info_schema.userstats --collect.info_schema.tables --collect.perf_schema.tablelocks --collect.perf_schema.file_events --collect.perf_schema.eventswaits --collect.perf_schema.indexiowaits --collect.perf_schema.tableiowaits --collect.slave_status
+
+  database:
+    build:
+      context: containers/database
+    image: monitor/database
+    container_name: database
+    volumes:
+      - type: volume
+        source: db-data
+        target: /var/lib/mysql
+    ports:
+      - 3316:3306
+    environment:
+      - MYSQL_ROOT_PASSWORD=petclinic
+      - MYSQL_DATABASE=petclinic
+
+  petclinic:
+    build:
+      context: containers/petclinic
+      dockerfile: Dockerfile
+    image: monitor/petclinic
+    container_name: petclinic
+    environment:
+      - DBSERVERNAME=database
+      - DBUSERNAME=root
+      - DBPASSWORD=petclinic
+    ports:
+      - 1080:8080
+
+  wordpress:
+    build:
+      context: containers/wordpress
+    image: monitor/wordpress
+    container_name: wordpress
+    volumes:
+      - type: volume
+        source: wp-data
+        target: /var/www/html
+    ports:
+      - 8443:8443
+      - 1180:8001
+      - 1280:8080
+    environment:
+    - WORDPRESS_DB_USER=root
+    - WORDPRESS_DB_PASSWORD=petclinic
+    - WORDPRESS_DB_NAME=wordpress
+    - WORDPRESS_DB_HOST=database
+    - WORDPRESS_TABLE_PREFIX=wp_
+    - WORDPRESS_HOST=wordpress
+
+volumes:
+  prom-data:
+  wp-data:
+  db-data:

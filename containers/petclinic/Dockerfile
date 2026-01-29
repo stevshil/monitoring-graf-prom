@@ -1,0 +1,56 @@
+# FROM maven:3.6.3-jdk-11 AS compile
+FROM maven:3.8.7-openjdk-18 AS compile
+RUN git clone https://github.com/spring-projects/spring-petclinic.git /usr/src/mymaven
+WORKDIR /usr/src/mymaven
+# Add prometheus monitoring to pom
+RUN sed -i '/^  <\/dependencies>/i\
+    <dependency>\n\
+        <groupId>io.micrometer<\/groupId>\n\
+        <artifactId>micrometer-registry-prometheus<\/artifactId>\n\
+        <scope>runtime<\/scope>\n\
+    <\/dependency>\n\
+    <dependency>\n\
+        <groupId>org.springframework.boot<\/groupId>\n\
+        <artifactId>spring-boot-starter-aop<\/artifactId>\n\
+        <version>3.4.4<\/version>\n\
+    <\/dependency>' pom.xml
+RUN cat pom.xml
+RUN mvn -Dmaven.test.skip=true package
+RUN ls /usr/src/mymaven/target
+
+FROM ubuntu:22.04
+RUN apt update
+RUN apt install -y openjdk-21-jre
+RUN mkdir /app
+RUN apt-get -y update
+RUN apt-get -y install netcat wget
+ENV DBSERVERNAME=mysql
+ENV DBPASSWORD=petclinic
+ENV DBUSERNAME=root
+COPY --from=compile /usr/src/mymaven/target/*.jar /app/petclinic.jar
+COPY application.properties.tmplt /app/
+COPY petclinic.sh /app/petclinic.sh
+RUN chmod +x /app/petclinic.sh
+
+# Install monitoring
+RUN wget https://github.com/ncabatoff/process-exporter/releases/download/v0.7.5/process-exporter-0.7.5.linux-amd64.tar.gz -O /tmp/process-exporter-0.7.5.linux-amd64.tar.gz
+RUN mkdir /opt/exporters
+RUN cd /opt/exporters;
+RUN tar xvf /tmp/process-exporter-0.7.5.linux-amd64.tar.gz
+RUN mv process-exporter-0.7.5.linux-amd64/process-exporter /opt/exporters/process-exporter
+RUN rm -rf process-exporter-0.7.5.linux-amd64
+RUN rm -f process-exporter-0.7.5.linux-amd64.tar.gz
+COPY process-exporter.conf /opt/exporters
+RUN wget https://github.com/prometheus/node_exporter/releases/download/v1.2.0/node_exporter-1.2.0.linux-amd64.tar.gz -O /tmp/node_exporter-1.2.0.linux-amd64.tar.gz
+RUN cd /opt/exporters; tar xvf /tmp/node_exporter-1.2.0.linux-amd64.tar.gz; mv node*/node_exporter /opt/exporters/node_exporter
+RUN rm -rf /tmp/node_exporter-1.2.0.linux-amd64.tar.gz /opt/exporters/node_exporter-*
+RUN wget https://github.com/dundee/disk_usage_exporter/releases/download/v0.1.0/disk_usage_exporter_linux_amd64.tgz -O /tmp/disk_usage_exporter_linux_amd64.tgz
+RUN cd /opt/exporters; tar xvf /tmp/disk_usage_exporter_linux_amd64.tgz; mv disk* disk_usage_exporter
+COPY disk_usage_exporter.yaml /opt/exporters/disk_usage_exporter.yaml
+EXPOSE 9100
+EXPOSE 9995
+EXPOSE 9256
+EXPOSE 8080
+
+WORKDIR /app
+ENTRYPOINT ["./petclinic.sh"]
