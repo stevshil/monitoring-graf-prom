@@ -42,3 +42,10 @@ Password: petclinic
 ### dbmon
 
 This is a mysql-exporter which provides metrics as a side car from MariaDB database to Prometheus, rather than it running directly in the database container.
+
+# Useful References
+
+- Setting up Grafana and Loki
+  - https://grafana.com/docs/alloy/latest/tutorials/send-logs-to-loki/
+- Loki API documentation
+  - https://grafana.com/docs/loki/latest/reference/loki-http-api/

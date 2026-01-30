@@ -47,6 +47,11 @@ RUN rm -rf /tmp/node_exporter-1.2.0.linux-amd64.tar.gz /opt/exporters/node_expor
 RUN wget https://github.com/dundee/disk_usage_exporter/releases/download/v0.1.0/disk_usage_exporter_linux_amd64.tgz -O /tmp/disk_usage_exporter_linux_amd64.tgz
 RUN cd /opt/exporters; tar xvf /tmp/disk_usage_exporter_linux_amd64.tgz; mv disk* disk_usage_exporter
 COPY disk_usage_exporter.yaml /opt/exporters/disk_usage_exporter.yaml
+# Grafana Alloy
+RUN apt -y install gpg && wget -O /etc/apt/keyrings/grafana.asc https://apt.grafana.com/gpg-full.key && chmod 644 /etc/apt/keyrings/grafana.asc
+RUN echo "deb [signed-by=/etc/apt/keyrings/grafana.asc] https://apt.grafana.com stable main" > /etc/apt/sources.list.d/grafana.list
+RUN apt update && apt -y install alloy
+COPY config.alloy /etc/alloy/config.alloy
 EXPOSE 9100
 EXPOSE 9995
 EXPOSE 9256

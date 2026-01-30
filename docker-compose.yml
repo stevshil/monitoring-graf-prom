@@ -16,9 +16,16 @@ services:
       - 3000:3000
     volumes:
       - ./containers/grafana/data:/var/lib/grafana
-      - ./containers/grafana/prometheus.yaml:/etc/grafana/provisioning/datasources/prometheus.yml
+      - ./containers/grafana/datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yml
     environment:
       - GF_PLUGINS_PREINSTALL=grafana-simple-json-datasource
+
+  loki:
+    image: grafana/loki
+    ports:
+      - 3100:3100
+    command: -config.file=/etc/loki/local-config.yaml
+
 
   dbmon:
     image: prom/mysqld-exporter:v0.13.0
@@ -54,6 +61,7 @@ services:
       - DBPASSWORD=petclinic
     ports:
       - 1080:8080
+      - 12345:12345
 
   wordpress:
     build:
@@ -68,6 +76,7 @@ services:
       - 8443:8443
       - 1180:8001
       - 1280:8080
+      - 12346:12345
     environment:
     - WORDPRESS_DB_USER=root
     - WORDPRESS_DB_PASSWORD=petclinic

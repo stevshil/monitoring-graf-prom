@@ -1,4 +1,4 @@
-FROM wordpress:5.8-apache
+FROM wordpress
 ENV WORDPRESS_DB_USER=root
 ENV WORDPRESS_DB_PASSWORD=petclinic
 ENV WORDPRESS_DB_NAME=wordpress
@@ -28,15 +28,21 @@ RUN wget https://github.com/dundee/disk_usage_exporter/releases/download/v0.1.0/
 RUN cd /opt/exporters; tar xvf /tmp/disk_usage_exporter_linux_amd64.tgz; mv disk* disk_usage_exporter
 COPY disk_usage_exporter.yaml /opt/exporters/disk_usage_exporter.yaml
 
+# Grafana Alloy
+RUN apt -y install gpg && wget -O /etc/apt/keyrings/grafana.asc https://apt.grafana.com/gpg-full.key && chmod 644 /etc/apt/keyrings/grafana.asc
+RUN echo "deb [signed-by=/etc/apt/keyrings/grafana.asc] https://apt.grafana.com stable main" > /etc/apt/sources.list.d/grafana.list
+RUN apt update && apt -y install alloy
+COPY config.alloy /etc/alloy/config.alloy
+
 # Change port 80 as OpenShift doesn't like it
 RUN sed -i 's, \*:80>, *:8001>,' /etc/apache2/sites-enabled/000-default.conf
 RUN sed -i 's/80/8001/' /etc/apache2/ports.conf
 
 # Set logs to be in the container and to stdout/err
-# RUN rm /var/log/apache2/*
-# RUN sed -i 's,ErrorLog.*,ErrorLog "|/usr/bin/tee ${APACHE_LOG_DIR}/error.log",' /etc/apache2/sites-enabled/000-default.conf
-# RUN sed -i 's,CustomLog.*,CustomLog "|/usr/bin/tee ${APACHE_LOG_DIR}/access.log" combined,' /etc/apache2/sites-enabled/000-default.conf
-# RUN egrep "CustomLog|ErrorLog" /etc/apache2/sites-enabled/000-default.conf
+RUN rm /var/log/apache2/*
+RUN sed -i 's,ErrorLog.*,ErrorLog "|/usr/bin/tee ${APACHE_LOG_DIR}/error.log",' /etc/apache2/sites-enabled/000-default.conf
+RUN sed -i 's,CustomLog.*,CustomLog "|/usr/bin/tee ${APACHE_LOG_DIR}/access.log" combined,' /etc/apache2/sites-enabled/000-default.conf
+RUN egrep "CustomLog|ErrorLog" /etc/apache2/sites-enabled/000-default.conf
 
 # Not working, but get /server-status url working for apache-exporter
 # COPY 001-status.conf /etc/apache2/sites-enabled/001-status.conf
@@ -61,5 +67,7 @@ cd /opt/exporters\n \
 ./disk_usage_exporter &\n \
 # # Migrate the DB \n \
 # php /var/www/html/migrate.php &\n \
+# Run Grafana Alloy
+alloy run --server.http.listen-addr=0.0.0.0:12345 --cluster.node-name=wordpress /etc/alloy/config.alloy & \n \
 # Run web server \n \
 apache2ctl -D FOREGROUND' /usr/local/bin/docker-entrypoint.sh

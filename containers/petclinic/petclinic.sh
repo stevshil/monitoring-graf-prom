@@ -39,5 +39,8 @@ cd /opt/exporters
 # Start disk usage
 ./disk_usage_exporter &
 
+# Start Grafana Alloy for Loki logs
+alloy run --server.http.listen-addr=0.0.0.0:12345 --cluster.node-name=petclinic /etc/alloy/config.alloy &
+
 cd /app
-java -jar ./petclinic.jar
+java -jar ./petclinic.jar 2>&1 | tee petclinic.log
